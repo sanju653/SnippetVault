@@ -1,0 +1,23 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and build files
+snippet_fronted/node_modules/
+snippet_fronted/dist/
+
+# Backend Maven build files
+snippet_backend/snippet_vault/target/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
