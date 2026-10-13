@@ -176,7 +176,7 @@ public class OAuth2SuccessHandler
 
         // Redirect to Snippet Vault frontend
         String redirectUrl =
-                "https://snippetvault-1ad38difv-abcd-76ce.vercel.app/oauth2/success"
+                "https://snippetvault-sand.vercel.app/oauth2/success"
                         + "?accessToken=" + accessToken
                         + "&refreshToken=" + refreshToken
                         + "&id=" + user.getId()

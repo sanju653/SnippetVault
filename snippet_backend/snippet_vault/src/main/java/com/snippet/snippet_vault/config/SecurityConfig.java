@@ -68,7 +68,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost:5173","https://snippetvault-1ad38difv-abcd-76ce.vercel.app")
+                List.of("http://localhost:5173","https://snippetvault-sand.vercel.app")
         );
 
         configuration.setAllowedMethods(
