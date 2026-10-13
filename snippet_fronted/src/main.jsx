@@ -13,7 +13,7 @@ import "./styles/AllSnippets.css";
 import "./styles/SnippetDetails.css";
 import "./styles/EditSnippet.css";
 import "./styles/Login.css";
-import "./styles/register.css";
+import "./styles/Register.css";
 
 import "./styles/Home.css"
 
