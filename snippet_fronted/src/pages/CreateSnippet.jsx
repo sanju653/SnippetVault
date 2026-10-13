@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import { createSnippet } from "../services/snippetService";
-import CodeEditor from "../components/codeEditor";
+import CodeEditor from "../components/CodeEditor";
+
 
 function CreateSnippet() {
   const navigate = useNavigate();

@@ -2,16 +2,15 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
 function Sidebar() {
-  // Used to redirect the user to the login page.
+  
   const navigate = useNavigate();
 
-  // Get the current user's information from Zustand.
-  const user = useAuthStore((state) => state.user);
+  //const user = useAuthStore((state) => state.user);
 
-  // Get the logout function from Zustand.
+ 
   const logout = useAuthStore((state) => state.logout);
 
-  // Runs when the logout button is clicked.
+
   const handleLogout = () => {
     logout();
     navigate("/", { replace: true });
@@ -29,8 +28,11 @@ function Sidebar() {
 
         <NavLink
           to="/"
-          end
+          end //This tells React Router to consider the link active only when =>the current pathname matches its destination exactly.
+          //Remember: end prevents the Dashboard link from staying active on every page.
           className={({ isActive }) =>
+            //isActive : built-in property provided by React Router's NavLink
+            //indicates whether the link is active.
             `sidebar-link ${isActive ? "active" : ""}`
           }
         >
@@ -109,7 +111,7 @@ function Sidebar() {
             {user?.name?.charAt(0)?.toUpperCase() || "D"}
           </div>
 
-          <div className="user-info">
+          <div className="user-finfo">
             <h6>{user?.name || "Developer"}</h6>
             <span>{user?.email || "Free Account"}</span>
           </div> */}
