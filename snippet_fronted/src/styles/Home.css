@@ -282,7 +282,7 @@ padding-top: 55px;
 padding-bottom: 55px;
 }
 
-```
+
 .home-hero {
     grid-template-columns: 1fr;
     gap: 45px;
@@ -311,7 +311,7 @@ padding-bottom: 55px;
 .home-title {
     font-size: clamp(38px, 6vw, 54px);
 }
-```
+
 
 }
 
@@ -321,7 +321,7 @@ padding-bottom: 55px;
 padding: 16px 5%;
 }
 
-```
+
 .home-brand {
     font-size: 21px;
 }
@@ -380,6 +380,6 @@ padding: 16px 5%;
 .home-preview-feature {
     padding: 13px;
 }
-```
+
 
 }
