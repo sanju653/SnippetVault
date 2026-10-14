@@ -87,7 +87,7 @@ function AllSnippets() {
     const dateValue = snippet.updatedAt || snippet.createdAt;
 
     if (dateValue) {
-      const date = new Date(dateValue);
+     const date = new Date(`${dateValue}+05:30`);
 
       if (!Number.isNaN(date.getTime())) {
         const diff = Date.now() - date.getTime();

@@ -1,142 +1,109 @@
-//Axios is a JavaScript library used to send HTTP requests from your React application.
-// persist only remembers the login state.
-// It does not automatically send the JWT to Spring Boot.
-//
-// Connect the JWT token from Zustand to Axios so every protected
-// request automatically sends the token to Spring Boot.
-//
-// We will add an Axios request interceptor.
-// When we hit a protected API, Axios first runs this interceptor
-// and gets the JWT from Zustand.
-//
-// The request sent to Spring Boot becomes:
-//
-// GET /api/snippets
-// Authorization:
-// Bearer eyJhbGciOiJIUzI1Ni...
-
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
 const api = axios.create({
-
     baseURL: import.meta.env.VITE_API_URL,
-
     headers: {
         "Content-Type": "application/json",
     },
 });
 
-//An interceptor allows you to process requests or responses before your application handles them
-// ===============================
-// REQUEST INTERCEPTOR=>Runs before a request is sent.Common use: Attach the JWT access token to protected API requests.
-// ===============================
+// Keep one refresh request for concurrent 401 responses.
+let refreshPromise = null;
 
-api.interceptors.request.use((config) => {
+// REQUEST INTERCEPTOR
+api.interceptors.request.use(
+    (config) => {
+        const token = useAuthStore.getState().accessToken;
 
-    const token = useAuthStore.getState().accessToken;
-
-    if (token) {
-
-        config.headers.Authorization =
-            `Bearer ${token}`;
-    }
-
-    return config;
-});
-
-
-// ===============================
-// RESPONSE INTERCEPTOR=>uns when a response arrives or an error occurs
-// ===============================
-//Its main job is to automatically refresh an expired access token and retry the failed API request without asking the user to log in again.
-api.interceptors.response.use(
-
-    // If response is successful
-    (response) => {
-
-        return response;
-    },
-
-
-    // If response has an error
-    async (error) => {
-
-        const originalRequest = error.config;//Configuration of the failed request.originalRequest refers to the request that failed
-
-
-        // Check for 401 Unauthorized
-        if (
-            error.response?.status === 401 &&
-            originalRequest &&//this checks that the failed request's configuration exists.We need the original request because we intend to retry it.
-            !originalRequest._retry &&//This prevents the same request from repeatedly attempting token refresh.Initially, this property is usually undefined.!undefined // true.The request is eligible for a refresh attempt.But after we set:originalRequest._retry = true;!true = false
-            !originalRequest.url?.includes("/auth/login") &&
-            !originalRequest.url?.includes("/auth/register") &&
-            !originalRequest.url?.includes("/auth/refresh")
-        ) {
-
-            originalRequest._retry = true;
-
-            try {
-
-                // Get refresh token from Zustand
-                const refreshToken =
-                    useAuthStore.getState().refreshToken;
-
-
-                // No refresh token
-                if (!refreshToken) {
-
-                    useAuthStore.getState().logout();
-
-                    return Promise.reject(error);
-                }
-
-
-                // Send refresh token
-                const response = await axios.post(
-                    `${import.meta.env.VITE_API_URL}/auth/refresh`,
-                    {
-                        refreshToken: refreshToken
-                    }
-                );
-
-
-                const newAccessToken =
-                    response.data.accessToken;
-
-
-                // Save new access token
-                useAuthStore.setState({
-
-                    accessToken: newAccessToken,
-
-                });
-
-
-                // Update original request
-                originalRequest.headers.Authorization =
-                    `Bearer ${newAccessToken}`;
-
-
-                // Retry original request
-                return api(originalRequest);
-
-
-            } catch (refreshError) {
-
-                // Refresh token is invalid or expired
-                useAuthStore.getState().logout();
-
-                return Promise.reject(refreshError);
-            }
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
         }
 
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
 
-        return Promise.reject(error);
+// RESPONSE INTERCEPTOR
+api.interceptors.response.use(
+    (response) => response,
+
+    async (error) => {
+        const originalRequest = error.config;
+
+        if (
+            error.response?.status !== 401 ||
+            !originalRequest ||
+            originalRequest._retry ||
+            originalRequest.url?.includes("/auth/login") ||
+            originalRequest.url?.includes("/auth/register") ||
+            originalRequest.url?.includes("/auth/refresh")
+        ) {
+            return Promise.reject(error);
+        }
+
+        originalRequest._retry = true;
+
+        const authStore = useAuthStore.getState();
+        const refreshToken = authStore.refreshToken;
+
+        if (!refreshToken) {
+            authStore.logout();
+            return Promise.reject(error);
+        }
+
+        try {
+            // Concurrent requests reuse the same refresh request.
+            if (!refreshPromise) {
+                refreshPromise = axios
+                    .post(
+                        `${import.meta.env.VITE_API_URL}/auth/refresh`,
+                        { refreshToken }
+                    )
+                    .then((response) => {
+                        const newAccessToken =
+                            response.data.accessToken;
+
+                        if (!newAccessToken) {
+                            throw new Error(
+                                "Refresh response did not contain an access token."
+                            );
+                        }
+
+                        useAuthStore.setState({
+                            accessToken: newAccessToken,
+                        });
+
+                        return newAccessToken;
+                    })
+                    .finally(() => {
+                        refreshPromise = null;
+                    });
+            }
+
+            const newAccessToken = await refreshPromise;
+
+            originalRequest.headers =
+                originalRequest.headers || {};
+
+            originalRequest.headers.Authorization =
+                `Bearer ${newAccessToken}`;
+
+            return api(originalRequest);
+
+        } catch (refreshError) {
+            const status = refreshError.response?.status;
+
+            // Log out only when the backend explicitly rejects
+            // the refresh token as an authentication failure.
+            if (status === 401 || status === 403) {
+                useAuthStore.getState().logout();
+            }
+
+            return Promise.reject(refreshError);
+        }
     }
 );
 
-
 export default api;
-

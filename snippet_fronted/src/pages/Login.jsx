@@ -21,17 +21,34 @@ function Login() {
   const successMessage = location.state?.message;
 
   // Google OAuth2 login
-  const handleGoogleLogin = () => {
-    window.location.href =//It means tell the browser to open this URL.Used to navigate the browser to a URL.
-    //navigate() is generally used for React app routes, while window.location.href is useful when you need the browser to visit an external website or initiate an OAuth flow through your backend.
-      `${import.meta.env.VITE_BACKEND_URL}/oauth2/authorization/google`;
-  };
+ const handleGoogleLogin = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+if (!backendUrl) { setError("Backend URL is not configured."); return; }
+    const origin =
+        window.location.hostname === "localhost"
+            ? "local"
+            : "production";
+
+    console.log("Backend URL:", backendUrl);
+    console.log("Frontend origin:", origin);
+
+
+    window.location.href =
+        `${backendUrl}/oauth2/authorization/google?origin=${origin}`;
+};
 
   // GitHub OAuth2 login
-  const handleGithubLogin = () => {
+ const handleGithubLogin = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+if (!backendUrl) { setError("Backend URL is not configured."); return; }
+    const origin =
+        window.location.hostname === "localhost"
+            ? "local"
+            : "production";
+
     window.location.href =
-      `${import.meta.env.VITE_BACKEND_URL}/oauth2/authorization/github`;
-  };
+        `${backendUrl}/oauth2/authorization/github?origin=${origin}`;
+};
 
   // Email and password login
   const handleSubmit = async (e) => {
