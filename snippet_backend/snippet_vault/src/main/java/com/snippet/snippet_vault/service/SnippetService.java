@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -91,8 +92,8 @@ public class SnippetService {
                 .language(snippetRequest.getLanguage())
                 .summary(summary)
                 .tags(tags)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")))
+                .updatedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")))
                 .user(user)
                 .build();
         Snippet savedSnippet = snippetRepository.save(snippet);
@@ -111,7 +112,7 @@ public class SnippetService {
         snippet.setSummary(snippetRequest.getSummary());
         snippet.setTags(snippetRequest.getTags());
 
-        snippet.setUpdatedAt(LocalDateTime.now());
+        snippet.setUpdatedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
 
         Snippet updatedSnippet = snippetRepository.save(snippet);
         return convertToResponse(updatedSnippet);
@@ -215,7 +216,7 @@ public class SnippetService {
         //  Update and save the existing snippet
         snippet.setSummary(summary);
         snippet.setTags(tags);
-        snippet.setUpdatedAt(LocalDateTime.now());
+        snippet.setUpdatedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
 
         Snippet savedSnippet = snippetRepository.save(snippet);
 

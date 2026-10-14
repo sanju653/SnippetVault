@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
@@ -15,11 +16,13 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +30,22 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
-public class OAuth2SuccessHandler
-        implements AuthenticationSuccessHandler {
+public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
+
+
+    private static final String FRONTEND_ORIGIN_SESSION_KEY =
+            "SNIPPET_VAULT_FRONTEND_ORIGIN";
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final OAuth2AuthorizedClientService authorizedClientService;
+
+    @Value("${app.frontend.local-url}")
+    private String localFrontendUrl;
+
+    @Value("${app.frontend.production-url}")
+    private String productionFrontendUrl;
 
     @Override
     public void onAuthenticationSuccess(
@@ -51,14 +63,12 @@ public class OAuth2SuccessHandler
         String registrationId =
                 oauthToken.getAuthorizedClientRegistrationId();
 
-        String email =
-                oauthUser.getAttribute("email");
+        String email = oauthUser.getAttribute("email");
+        String name = oauthUser.getAttribute("name");
 
-        String name =
-                oauthUser.getAttribute("name");
-
-        // GitHub may not provide email directly
-        if ("github".equals(registrationId) && email == null) {
+        // GitHub may not provide an email in its initial user profile.
+        if ("github".equals(registrationId)
+                && (email == null || email.isBlank())) {
 
             OAuth2AuthorizedClient client =
                     authorizedClientService.loadAuthorizedClient(
@@ -88,7 +98,7 @@ public class OAuth2SuccessHandler
 
                 if (emails != null) {
 
-                    // First try primary + verified email
+                    // Prefer the primary, verified email.
                     for (Map<String, Object> emailData : emails) {
 
                         Boolean primary =
@@ -105,9 +115,8 @@ public class OAuth2SuccessHandler
                         }
                     }
 
-                    // If primary verified email wasn't found,
-                    // try any verified email
-                    if (email == null) {
+                    // Otherwise, use any verified email.
+                    if (email == null || email.isBlank()) {
 
                         for (Map<String, Object> emailData : emails) {
 
@@ -125,70 +134,89 @@ public class OAuth2SuccessHandler
             }
         }
 
-        // Stop instead of creating a user with null email
         if (email == null || email.isBlank()) {
-            throw new RuntimeException(
-                    "Unable to get email from OAuth provider"
+            response.sendError(
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Unable to retrieve email from OAuth provider"
             );
+            return;
         }
 
-        // GitHub name can be null
+        // GitHub may not provide a display name.
         if (name == null || name.isBlank()) {
             name = oauthUser.getAttribute("login");
         }
 
-        // Use email prefix if the provider doesn't supply a name
         if (name == null || name.isBlank()) {
             name = email.substring(0, email.indexOf("@"));
         }
 
-        // Find existing user or create a new one
         String finalName = name;
         String finalEmail = email;
 
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseGet(() -> {
+        // Find the existing user or create a new user.
+        User user = userRepository.findByEmail(finalEmail)
+                .orElseGet(() -> {
 
-                            User newUser =
-                                    User.builder()
-                                            .name(finalName)
-                                            .email(finalEmail)
-                                            .password(
-                                                    passwordEncoder.encode(
-                                                            UUID.randomUUID()
-                                                                    .toString()
-                                                    )
-                                            )
-                                            .role(Role.USER)
-                                            .createdAt(LocalDateTime.now())
-                                            .build();
+                    User newUser = User.builder()
+                            .name(finalName)
+                            .email(finalEmail)
+                            .password(
+                                    passwordEncoder.encode(
+                                            UUID.randomUUID().toString()
+                                    )
+                            )
+                            .role(Role.USER)
+                            .createdAt(LocalDateTime.now())
+                            .build();
 
-                            return userRepository.save(newUser);
-                        });
+                    return userRepository.save(newUser);
+                });
 
-        // Generate Snippet Vault JWTs
+        // Generate SnippetVault JWTs.
         String accessToken =
                 jwtService.generateAccessToken(user.getEmail());
 
         String refreshToken =
                 jwtService.generateRefreshToken(user.getEmail());
 
-        // Redirect to Snippet Vault frontend
+        // Read the frontend choice saved before OAuth2 login began.
+        String origin = null;
+
+        if (request.getSession(false) != null) {
+            origin = (String) request.getSession(false).getAttribute(
+                    FRONTEND_ORIGIN_SESSION_KEY
+            );
+
+            request.getSession(false).removeAttribute(
+                    FRONTEND_ORIGIN_SESSION_KEY
+            );
+        }
+
+        // Only accept the two explicitly supported choices.
+        String frontendUrl;
+
+        if ("local".equals(origin)) {
+            frontendUrl = localFrontendUrl;
+        } else {
+            frontendUrl = productionFrontendUrl;
+        }
+
+        // Construct the frontend callback URL.
         String redirectUrl =
-                "https://snippetvault-sand.vercel.app/oauth2/success"
-                        + "?accessToken=" + accessToken
-                        + "&refreshToken=" + refreshToken
+                frontendUrl + "/oauth2/success"
+                        + "?accessToken=" + encode(accessToken)
+                        + "&refreshToken=" + encode(refreshToken)
                         + "&id=" + user.getId()
-                        + "&name=" + java.net.URLEncoder.encode(
-                        user.getName(),
-                        java.nio.charset.StandardCharsets.UTF_8
-                )
-                        + "&email=" + java.net.URLEncoder.encode(
-                        user.getEmail(),
-                        java.nio.charset.StandardCharsets.UTF_8
-                );
+                        + "&name=" + encode(user.getName())
+                        + "&email=" + encode(user.getEmail());
 
         response.sendRedirect(redirectUrl);
     }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+
 }
