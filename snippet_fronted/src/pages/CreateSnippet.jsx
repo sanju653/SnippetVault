@@ -62,7 +62,7 @@ function CreateSnippet() {
       console.error("Failed to create snippet:", err);
 
       if (err.response?.status === 401) {
-        setError("Your session has expired. Please log in again.");
+        setError("Authentication failed. Please log in again.");
       } else {
         setError(
           err.response?.data?.message ||
