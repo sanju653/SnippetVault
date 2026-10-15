@@ -20,8 +20,7 @@ public class Snippet {
     @Column(nullable = false)
     private String title;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(name = "code_content", columnDefinition = "LONGTEXT", nullable = false)
     private String codeContent;
 
     @Column(nullable = false)
